@@ -1,0 +1,186 @@
+version: '3'
+
+nokdemo:
+  build: .
+  container_name: nokdemo
+  ports:
+    - "5000:5000"
+  volumes:
+    - .:/nokdemo
+
+services:
+  nokdemo:
+    image: elefedefe/nokdemo
+    container_name: nokdemo
+    environment:
+      - "ST2_ADDRESS=stackstorm"
+      - "API_KEY=ZTNlNjM0NzY1ZDE0ZDEyZjNmNTc3MzNiMjUwOGI4MWQ1MGFmM2RlMGNjNmIwMGM3Yzg4MDllYmMxZTI4NjNhOA"
+    ports:
+      - "5000:5000"
+    networks:
+      - nokdemo-net
+    volumes:
+      - .:/nokdemo
+  
+  stackstorm:
+    image: stackstorm/stackstorm:${TAG:-latest}
+    container_name: stackstorm
+    env_file:
+      - st2-docker/conf/stackstorm.env
+      - st2-docker/conf/mongo.env
+      - st2-docker/conf/rabbitmq.env
+      - st2-docker/conf/postgres.env
+      - st2-docker/conf/redis.env
+    ports:
+      - "443:443"
+    networks:
+      - public
+      - private
+      - nokdemo-net
+    volumes:
+      - stackstorm-packs-volume:/opt/stackstorm/packs
+      - stackstorm-virtualenvs-volume:/opt/stackstorm/virtualenvs
+      - stackstorm-configs-volume:/opt/stackstorm/configs
+      - stackstorm-log-volume:/var/log
+      - ./st2-docker/packs.dev:/opt/stackstorm/packs.dev
+      - ./st2-docker/runtime/entrypoint.d:/st2-docker/entrypoint.d
+      - ./st2-docker/runtime/st2.d:/st2-docker/st2.d
+      - ./st2-docker/conf/stackstorm.env:/st2-docker/env
+    dns_search: .
+  
+  jira:
+    depends_on:
+      - postgresql
+    image: blacklabelops/jira
+    networks:
+      - jiranet
+      - nokdemo-net
+    volumes:
+      - jiradata:/var/atlassian/jira
+    ports:
+      - '80:8080'
+    environment:
+      - 'JIRA_DATABASE_URL=postgresql://jira@postgresql/jiradb'
+      - 'JIRA_DB_PASSWORD=jellyfish'
+      - 'CATALINA_OPTS= -Xms256m -Xmx1g'
+      - 'JIRA_PROXY_NAME='
+      - 'JIRA_PROXY_PORT='
+      - 'JIRA_PROXY_SCHEME='
+    labels:
+      com.blacklabelops.description: "Atlassian Jira"
+      com.blacklabelops.service: "jira"
+
+
+
+### External Services
+
+  mongo:
+    image: mongo:3.4
+    container_name: mongo
+    env_file:
+      - st2-docker/conf/mongo.env
+    networks:
+      - private
+    volumes:
+      - mongo-volume:/data/db
+      - mongo-configdb-volume:/data/configdb
+    dns_search: .
+  rabbitmq:
+    image: rabbitmq:3.6-management
+    container_name: rabbitmq
+    env_file:
+      - st2-docker/conf/rabbitmq.env
+    networks:
+      - private
+    volumes:
+      - rabbitmq-volume:/var/lib/rabbitmq
+    dns_search: .
+  postgres:
+    image: postgres:9.6
+    container_name: postgres
+    env_file:
+      - st2-docker/conf/postgres.env
+    networks:
+      - private
+    volumes:
+      - postgres-volume:/var/lib/postgresql/data
+    dns_search: .
+  redis:
+    image: redis:4.0
+    container_name: redis
+    env_file:
+      - st2-docker/conf/redis.env
+    networks:
+      - private
+    volumes:
+      - redis-volume:/data
+    dns_search: .
+    command: [
+      "bash", "-c",
+      '
+       docker-entrypoint.sh
+       --requirepass "$$REDIS_PASSWORD"
+      '
+    ]
+  postgresql:
+    image: blacklabelops/postgres
+    networks:
+      - jiranet
+    volumes:
+      - postgresqldata:/var/lib/postgresql/data
+    environment:
+      - 'POSTGRES_USER=jira'
+      # CHANGE THE PASSWORD!
+      - 'POSTGRES_PASSWORD=jellyfish'
+      - 'POSTGRES_DB=jiradb'
+      - 'POSTGRES_ENCODING=UNICODE'
+      - 'POSTGRES_COLLATE=C'
+      - 'POSTGRES_COLLATE_TYPE=C'
+    labels:
+      com.blacklabelops.description: "PostgreSQL Database Server"
+      com.blacklabelops.service: "postgresql"
+
+volumes:
+  mongo-volume:
+    external:
+      name: st2docker_mongo-volume
+  mongo-configdb-volume:
+    external:
+      name: st2docker_mongo-configdb-volume
+  postgres-volume:
+    external:
+      name: st2docker_postgres-volume
+  rabbitmq-volume:
+    external:
+      name: st2docker_rabbitmq-volume
+  redis-volume:
+    external:
+      name: st2docker_redis-volume
+  stackstorm-packs-volume:
+    external:
+      name: st2docker_stackstorm-packs-volume
+  stackstorm-virtualenvs-volume:
+    external:
+      name: st2docker_stackstorm-virtualenvs-volume
+  stackstorm-configs-volume:
+    external:
+      name: st2docker_stackstorm-configs-volume
+  stackstorm-log-volume:
+    external:
+      name: st2docker_stackstorm-log-volume
+  postgresqldata:
+    external:
+      name: jiradocker_postgresqldata
+  jiradata:
+    external:
+      name: jiradocker_jiradata
+
+networks:
+  public:
+    driver: bridge
+  private:
+    driver: bridge
+  nokdemo-net:
+    driver: bridge
+  jiranet:
+    driver: bridge
