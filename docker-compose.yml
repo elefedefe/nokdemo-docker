@@ -1,13 +1,5 @@
 version: '3'
 
-nokdemo:
-  build: .
-  container_name: nokdemo
-  ports:
-    - "5000:5000"
-  volumes:
-    - .:/nokdemo
-
 services:
   nokdemo:
     image: elefedefe/nokdemo
