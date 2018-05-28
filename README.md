@@ -178,7 +178,7 @@ docker pull elefedefe/nokdemo
     * In this example stackstorm container has the name `st2-docker_stackstorm_1`
 
 ```bash
-docker run --rm -d -p 5000:5000 --name nokdemo elefedefe/nokdemo <ST2_ADDRESS> <API_KEY_VALUE>
+docker run --rm -d -p 5000:5000 --name nokdemo elefedefe/nokdemo -s <ST2_ADDRESS> -a <API_KEY_VALUE>
 ```
 
 ## Create a dataflow network for docker containers
